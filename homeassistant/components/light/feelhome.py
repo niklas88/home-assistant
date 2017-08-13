@@ -9,13 +9,49 @@ import voluptuous as vol
 
 import homeassistant.helpers.config_validation as cv
 from homeassistant.components.light import (
-    ATTR_BRIGHTNESS, SUPPORT_BRIGHTNESS, ATTR_RGB_COLOR, SUPPORT_RGB_COLOR,
+    ATTR_BRIGHTNESS, SUPPORT_BRIGHTNESS, ATTR_RGB_COLOR, ATTR_EFFECT_LIST, ATTR_EFFECT,
+    SUPPORT_RGB_COLOR, SUPPORT_EFFECT,
     Light, PLATFORM_SCHEMA)
 from homeassistant.const import CONF_NAME, CONF_IP_ADDRESS, CONF_PORT, CONF_DEVICE, CONF_TYPE
 
 _LOGGER = logging.getLogger(__name__)
 
-SUPPORT_FEELHOMERGB = (SUPPORT_BRIGHTNESS | SUPPORT_RGB_COLOR)
+SUPPORT_FEELHOMERGB = (SUPPORT_BRIGHTNESS | SUPPORT_RGB_COLOR | SUPPORT_EFFECT)
+
+EFFECT_MAP_POWER = {
+        'static' : (0x50, 0x03)
+}
+
+EFFECT_MAP_DIM = dict(EFFECT_MAP_POWER)
+EFFECT_MAP_DIM.update({
+        'fading' : (0x44, 0x04),
+        'strobe' : (0x44, 0x05)
+})
+
+EFFECT_MAP_COLOR = dict(EFFECT_MAP_DIM)
+EFFECT_MAP_COLOR.update({
+        'colorwheel' : (0x43, 0x02),
+        'sunrise' : (0x43, 0x03)
+})
+
+EFFECT_MAP_STRIPE = dict(EFFECT_MAP_COLOR)
+EFFECT_MAP_STRIPE.update({
+        'randompixelunicolorfade' : (0x53, 0x04),
+        'randompixelrandomcolorfade' : (0x53, 0x05),
+        'rainbow' : (0x53, 0x06),
+        'fire' : (0x53, 0x07)
+})
+
+EFFECT_MAP_MATRIX = dict(EFFECT_MAP_COLOR)
+EFFECT_MAP_MATRIX.update({
+        'heart' : (0x4d, 0x00),
+})
+
+
+EFFECT_MAP_CLOCK = dict(EFFECT_MAP_COLOR)
+EFFECT_MAP_CLOCK.update({
+        'clock' : (0x54, 0x00)
+})
 
 DEFAULT_NAME = 'feelhome'
 
@@ -54,6 +90,8 @@ class FeelHomeRGBLight(Light):
         self._is_on = False
         self._brightness = 255
         self._rgb_color = [255, 255, 255]
+        self._effect = 'static'
+        self._effect_map = EFFECT_MAP_COLOR
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._seqnum = 0
 
@@ -98,6 +136,16 @@ class FeelHomeRGBLight(Light):
         """Return True if unable to access real state of the entity."""
         return True
 
+    @property
+    def effect_list(self):
+        """Return the list of supported effects."""
+        return list(self._effect_map.keys())
+
+    @property
+    def effect(self):
+        """Return the current effect."""
+        return self._effect
+
     def set_brightness(self, brightness):
         _LOGGER.info('setting brightness seqnum: {}, ip: {}, port: {}, devicenum: {}'.format(
             self._seqnum, self._ip, self._port, self._devicenum))
@@ -117,12 +165,24 @@ class FeelHomeRGBLight(Light):
         self._sock.sendto(msg, (self._ip, self._port))
         self._seqnum = (self._seqnum+1)%256
 
+    def set_effect(self, effect):
+        _LOGGER.info('effect: {} requested'.format(effect))
+        self._effect = effect
+        effect_group, effect_num = self._effect_map[self._effect]
+        MSG_FMT = '>BBBB'
+        msg = pack(MSG_FMT, self._seqnum, self._devicenum, effect_group, effect_num)
+        self._sock.sendto(msg, (self._ip, self._port))
+        self._seqnum = (self._seqnum+1)%256
+
+
     def turn_on(self, **kwargs):
         """Instruct the light to turn on and set correct brightness & color."""
         if ATTR_RGB_COLOR in kwargs:
             self.set_color(kwargs[ATTR_RGB_COLOR])
         if ATTR_BRIGHTNESS in kwargs:
             self.set_brightness(kwargs[ATTR_BRIGHTNESS])
+        if ATTR_EFFECT in kwargs:
+            self.set_effect(kwargs[ATTR_EFFECT])
         self._is_on = True
         _LOGGER.info('turning on seqnum: {}, ip: {}, port: {}, devicenum: {}'.format(
             self._seqnum, self._ip, self._port, self._devicenum))
