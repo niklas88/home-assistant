@@ -16,6 +16,7 @@ from homeassistant.const import CONF_NAME, CONF_IP_ADDRESS, CONF_PORT, CONF_DEVI
 
 _LOGGER = logging.getLogger(__name__)
 
+SUPPORT_FEELHOMEDIM = (SUPPORT_BRIGHTNESS | SUPPORT_EFFECT)
 SUPPORT_FEELHOMERGB = (SUPPORT_BRIGHTNESS | SUPPORT_RGB_COLOR | SUPPORT_EFFECT)
 
 EFFECT_MAP_POWER = {
@@ -71,12 +72,17 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
     ip = config.get(CONF_IP_ADDRESS)
     port = config.get(CONF_PORT)
     devicenum = config.get(CONF_DEVICE)
+    devicetype = config.get(CONF_TYPE)
+    
+    if (devicetype == "PowerLight"):
+      add_devices([FeelHomePowerLight(name, ip, port, devicenum)])    
+    elif (devicetype == "DimLight"):
+      add_devices([FeelHomeDimLight(name, ip, port, devicenum)])
+    elif (devicetype == "RGBLight"):
+      add_devices([FeelHomeRGBLight(name, ip, port, devicenum)])
 
-    add_devices([FeelHomeRGBLight(name, ip, port, devicenum)])
-
-
-class FeelHomeRGBLight(Light):
-    """Representation of a Feel@Home RGB Light."""
+class FeelHomePowerLight(Light):
+    """Representation of a Feel@Home Power Light."""
 
     def __init__(self, name, ip, port, devicenum):
         """Initialize a Feel@Home Light.
@@ -88,10 +94,6 @@ class FeelHomeRGBLight(Light):
         self._port = port
         self._devicenum = devicenum
         self._is_on = False
-        self._brightness = 255
-        self._rgb_color = [255, 255, 255]
-        self._effect = 'static'
-        self._effect_map = EFFECT_MAP_COLOR
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._seqnum = 0
 
@@ -99,27 +101,6 @@ class FeelHomeRGBLight(Light):
     def name(self):
         """Return the display name of this light."""
         return self._name
-
-    @property
-    def brightness(self):
-        """Read back the brightness of the light.
-
-        Returns integer in the range of 1-255.
-        """
-        return self._brightness
-
-    @property
-    def rgb_color(self):
-        """Read back the color of the light.
-
-        Returns [r, g, b] list with values in range of 0-255.
-        """
-        return self._rgb_color
-
-    @property
-    def supported_features(self):
-        """Flag supported features."""
-        return SUPPORT_FEELHOMERGB
 
     @property
     def is_on(self) -> bool:
@@ -134,7 +115,64 @@ class FeelHomeRGBLight(Light):
     @property
     def assumed_state(self) -> bool:
         """Return True if unable to access real state of the entity."""
-        return True
+        return False
+
+    def turn_on(self, **kwargs):
+        """Instruct the light to turn on and set correct brightness & color."""
+        self._is_on = True
+        _LOGGER.info('turning on seqnum: {}, ip: {}, port: {}, devicenum: {}'.format(
+            self._seqnum, self._ip, self._port, self._devicenum))
+        MSG_FMT = '>BBBBB'
+        msg = pack(MSG_FMT, self._seqnum, self._devicenum, 0x50, 0x01, 0x01)
+        self._sock.sendto(msg, (self._ip, self._port))
+        self._seqnum = (self._seqnum+1)%256
+        self.schedule_update_ha_state()
+
+    def turn_off(self, **kwargs):
+        """Instruct the light to turn off."""
+        self._is_on = False
+        _LOGGER.info('turning off seqnum: {}, ip: {}, port: {}, devicenum: {}'.format(
+            self._seqnum, self._ip, self._port, self._devicenum))
+        MSG_FMT = '>BBBBB'
+        msg = pack(MSG_FMT, self._seqnum, self._devicenum, 0x50, 0x01, 0x00)
+        self._sock.sendto(msg, (self._ip, self._port))
+        self._seqnum = (self._seqnum+1)%256
+        self.schedule_update_ha_state()
+        
+#    def update(self) -> None:
+#        _LOGGER.warn("update called")
+
+class FeelHomeDimLight(FeelHomePowerLight):
+    """Representation of a Feel@Home Dim Light."""
+
+    def __init__(self, name, ip, port, devicenum):
+        """Initialize a Feel@Home Light.
+
+        Default brightness and white color.
+        """
+        self._name = name
+        self._ip = ip
+        self._port = port
+        self._devicenum = devicenum
+        self._is_on = False
+        self._brightness = 255
+        self._effect = 'static'
+        self._effect_map = EFFECT_MAP_DIM
+        self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._seqnum = 0
+
+    @property
+    def brightness(self):
+        """Read back the brightness of the light.
+
+        Returns integer in the range of 1-255.
+        """
+        return self._brightness
+
+    @property
+    def supported_features(self):
+        """Flag supported features."""
+        return SUPPORT_FEELHOMEDIM
 
     @property
     def effect_list(self):
@@ -155,6 +193,56 @@ class FeelHomeRGBLight(Light):
         self._sock.sendto(msg, (self._ip, self._port))
         self._seqnum = (self._seqnum+1)%256
 
+    def set_effect(self, effect):
+        _LOGGER.info('effect: {} requested'.format(effect))
+        self._effect = effect
+        effect_group, effect_num = self._effect_map[self._effect]
+        MSG_FMT = '>BBBB'
+        msg = pack(MSG_FMT, self._seqnum, self._devicenum, effect_group, effect_num)
+        self._sock.sendto(msg, (self._ip, self._port))
+        self._seqnum = (self._seqnum+1)%256
+
+    def turn_on(self, **kwargs):
+        """Instruct the light to turn on and set correct brightness & color."""
+        if ATTR_BRIGHTNESS in kwargs:
+            self.set_brightness(kwargs[ATTR_BRIGHTNESS])
+        if ATTR_EFFECT in kwargs:
+            self.set_effect(kwargs[ATTR_EFFECT])
+        super().turn_on(**kwargs)
+
+class FeelHomeRGBLight(FeelHomeDimLight):
+    """Representation of a Feel@Home RGB Light."""
+
+    def __init__(self, name, ip, port, devicenum):
+        """Initialize a Feel@Home Light.
+
+        Default brightness and white color.
+        """
+        self._name = name
+        self._ip = ip
+        self._port = port
+        self._devicenum = devicenum
+        self._is_on = False
+        self._brightness = 255
+        self._rgb_color = [255, 255, 255]
+        self._effect = 'static'
+        self._effect_map = EFFECT_MAP_COLOR
+        self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._seqnum = 0
+
+    @property
+    def rgb_color(self):
+        """Read back the color of the light.
+
+        Returns [r, g, b] list with values in range of 0-255.
+        """
+        return self._rgb_color
+
+    @property
+    def supported_features(self):
+        """Flag supported features."""
+        return SUPPORT_FEELHOMERGB
+
     def set_color(self, color):
         _LOGGER.info('setting brightness seqnum: {}, ip: {}, port: {}, devicenum: {}'.format(
             self._seqnum, self._ip, self._port, self._devicenum))
@@ -165,43 +253,9 @@ class FeelHomeRGBLight(Light):
         self._sock.sendto(msg, (self._ip, self._port))
         self._seqnum = (self._seqnum+1)%256
 
-    def set_effect(self, effect):
-        _LOGGER.info('effect: {} requested'.format(effect))
-        self._effect = effect
-        effect_group, effect_num = self._effect_map[self._effect]
-        MSG_FMT = '>BBBB'
-        msg = pack(MSG_FMT, self._seqnum, self._devicenum, effect_group, effect_num)
-        self._sock.sendto(msg, (self._ip, self._port))
-        self._seqnum = (self._seqnum+1)%256
-
-
     def turn_on(self, **kwargs):
         """Instruct the light to turn on and set correct brightness & color."""
+        
         if ATTR_RGB_COLOR in kwargs:
             self.set_color(kwargs[ATTR_RGB_COLOR])
-        if ATTR_BRIGHTNESS in kwargs:
-            self.set_brightness(kwargs[ATTR_BRIGHTNESS])
-        if ATTR_EFFECT in kwargs:
-            self.set_effect(kwargs[ATTR_EFFECT])
-        self._is_on = True
-        _LOGGER.info('turning on seqnum: {}, ip: {}, port: {}, devicenum: {}'.format(
-            self._seqnum, self._ip, self._port, self._devicenum))
-        MSG_FMT = '>BBBBB'
-        msg = pack(MSG_FMT, self._seqnum, self._devicenum, 0x50, 0x01, 0x01)
-        self._sock.sendto(msg, (self._ip, self._port))
-        self._seqnum = (self._seqnum+1)%256
-        self.schedule_update_ha_state()
-
-    def turn_off(self, **kwargs):
-        """Instruct the light to turn off."""
-        self._is_on = False
-        _LOGGER.info('turning off seqnum: {}, ip: {}, port: {}, devicenum: {}'.format(
-            self._seqnum, self._ip, self._port, self._devicenum))
-        MSG_FMT = '>BBBBB'
-        msg = pack(MSG_FMT, self._seqnum, self._devicenum, 0x50, 0x01, 0x00)
-        self._sock.sendto(msg, (self._ip, self._port))
-        self._seqnum = (self._seqnum+1)%256
-        self.schedule_update_ha_state()
-
-#    def update(self) -> None:
-#        _LOGGER.warn("update called")
+        super().turn_on(**kwargs)
