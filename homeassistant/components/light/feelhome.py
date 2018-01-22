@@ -80,7 +80,12 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
       add_devices([FeelHomeDimLight(name, ip, port, devicenum)])
     elif (devicetype == "RGBLight"):
       add_devices([FeelHomeRGBLight(name, ip, port, devicenum)])
-
+    elif (devicetype == "StripeLight"):
+      add_devices([FeelHomeStripeLight(name, ip, port, devicenum)])
+    elif (devicetype == "MatrixLight"):
+      add_devices([FeelHomeMatrixLight(name, ip, port, devicenum)])
+    elif (devicetype == "WordClockLight"):
+      add_devices([FeelHomeWordClockLight(name, ip, port, devicenum)])
 class FeelHomePowerLight(Light):
     """Representation of a Feel@Home Power Light."""
 
@@ -150,16 +155,11 @@ class FeelHomeDimLight(FeelHomePowerLight):
 
         Default brightness and white color.
         """
-        self._name = name
-        self._ip = ip
-        self._port = port
-        self._devicenum = devicenum
-        self._is_on = False
+        FeelHomePowerLight.__init__(self,name,ip,port,devicenum)
         self._brightness = 255
         self._effect = 'static'
         self._effect_map = EFFECT_MAP_DIM
-        self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._seqnum = 0
+
 
     @property
     def brightness(self):
@@ -218,17 +218,9 @@ class FeelHomeRGBLight(FeelHomeDimLight):
 
         Default brightness and white color.
         """
-        self._name = name
-        self._ip = ip
-        self._port = port
-        self._devicenum = devicenum
-        self._is_on = False
-        self._brightness = 255
+        FeelHomeDimLight.__init__(self,name,ip,port,devicenum)
         self._rgb_color = [255, 255, 255]
-        self._effect = 'static'
         self._effect_map = EFFECT_MAP_COLOR
-        self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._seqnum = 0
 
     @property
     def rgb_color(self):
@@ -259,3 +251,35 @@ class FeelHomeRGBLight(FeelHomeDimLight):
         if ATTR_RGB_COLOR in kwargs:
             self.set_color(kwargs[ATTR_RGB_COLOR])
         super().turn_on(**kwargs)
+
+class FeelHomeStripeLight(FeelHomeRGBLight):
+    """Representation of a Feel@Home RGB Light."""
+
+    def __init__(self, name, ip, port, devicenum):
+        """Initialize a Feel@Home Light.
+
+        """
+        FeelHomeRGBLight.__init__(self,name,ip,port,devicenum)
+        self._rgb_color = [255, 255, 255]
+        self._effect_map = EFFECT_MAP_STRIPE 
+
+
+class FeelHomeMatrixLight(FeelHomeStripeLight):
+    """Representation of a Feel@Home RGB Light."""
+
+    def __init__(self, name, ip, port, devicenum):
+        """Initialize a Feel@Home Light.
+
+        """
+        FeelHomeStripeLight.__init__(self,name,ip,port,devicenum)
+        self._effect_map = EFFECT_MAP_MATRIX 
+
+class FeelHomeWordClockLight(FeelHomeMatrixLight):
+    """Representation of a Feel@Home RGB Light."""
+
+    def __init__(self, name, ip, port, devicenum):
+        """Initialize a Feel@Home Light.
+
+        """
+        FeelHomeMatrixLight.__init__(self,name,ip,port,devicenum)
+        self._effect_map = EFFECT_MAP_MATRIX
