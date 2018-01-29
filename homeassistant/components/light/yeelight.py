@@ -176,11 +176,6 @@ class YeelightLight(Light):
         return YEELIGHT_EFFECT_LIST
 
     @property
-    def unique_id(self) -> str:
-        """Return the ID of this light."""
-        return "{}.{}".format(self.__class__, self._ipaddr)
-
-    @property
     def color_temp(self) -> int:
         """Return the color temperature."""
         return self._color_temp
@@ -222,7 +217,8 @@ class YeelightLight(Light):
 
         color_mode = int(color_mode)
         if color_mode == 2:  # color temperature
-            return color_temperature_to_rgb(self.color_temp)
+            temp_in_k = mired_to_kelvin(self._color_temp)
+            return color_temperature_to_rgb(temp_in_k)
         if color_mode == 3:  # hsv
             hue = int(self._properties.get('hue'))
             sat = int(self._properties.get('sat'))

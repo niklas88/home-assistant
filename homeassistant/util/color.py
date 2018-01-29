@@ -357,7 +357,7 @@ def color_rgbw_to_rgb(r, g, b, w):
 
 def color_rgb_to_hex(r, g, b):
     """Return a RGB color from a hex color string."""
-    return '{0:02x}{1:02x}{2:02x}'.format(r, g, b)
+    return '{0:02x}{1:02x}{2:02x}'.format(round(r), round(g), round(b))
 
 
 def rgb_hex_to_rgb_list(hex_string):
@@ -392,8 +392,8 @@ def color_temperature_to_rgb(color_temperature_kelvin):
     return (red, green, blue)
 
 
-def _bound(color_component: float, minimum: float=0,
-           maximum: float=255) -> float:
+def _bound(color_component: float, minimum: float = 0,
+           maximum: float = 255) -> float:
     """
     Bound the given color component value between the given min and max values.
 

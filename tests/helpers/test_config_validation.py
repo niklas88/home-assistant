@@ -441,6 +441,27 @@ def test_datetime():
     schema('2016-11-23T18:59:08')
 
 
+def test_deprecated(caplog):
+    """Test deprecation log."""
+    schema = vol.Schema({
+        'venus': cv.boolean,
+        'mars': cv.boolean
+    })
+    deprecated_schema = vol.All(
+        cv.deprecated('mars'),
+        schema
+    )
+
+    deprecated_schema({'venus': True})
+    assert len(caplog.records) == 0
+
+    deprecated_schema({'mars': True})
+    assert len(caplog.records) == 1
+    assert caplog.records[0].name == __name__
+    assert ("The 'mars' option (with value 'True') is deprecated, "
+            "please remove it from your configuration.") in caplog.text
+
+
 def test_key_dependency():
     """Test key_dependency validator."""
     schema = vol.Schema(cv.key_dependency('beer', 'soda'))
@@ -503,18 +524,14 @@ def test_enum():
 
 def test_socket_timeout():  # pylint: disable=invalid-name
     """Test socket timeout validator."""
-    TEST_CONF_TIMEOUT = 'timeout'  # pylint: disable=invalid-name
-
-    schema = vol.Schema(
-        {vol.Required(TEST_CONF_TIMEOUT, default=None): cv.socket_timeout})
+    schema = vol.Schema(cv.socket_timeout)
 
     with pytest.raises(vol.Invalid):
-        schema({TEST_CONF_TIMEOUT: 0.0})
+        schema(0.0)
 
     with pytest.raises(vol.Invalid):
-        schema({TEST_CONF_TIMEOUT: -1})
+        schema(-1)
 
-    assert _GLOBAL_DEFAULT_TIMEOUT == schema({TEST_CONF_TIMEOUT:
-                                              None})[TEST_CONF_TIMEOUT]
+    assert _GLOBAL_DEFAULT_TIMEOUT == schema(None)
 
-    assert schema({TEST_CONF_TIMEOUT: 1})[TEST_CONF_TIMEOUT] == 1.0
+    assert schema(1) == 1.0
