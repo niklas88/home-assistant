@@ -9,15 +9,16 @@ import voluptuous as vol
 
 import homeassistant.helpers.config_validation as cv
 from homeassistant.components.light import (
-    ATTR_BRIGHTNESS, SUPPORT_BRIGHTNESS, ATTR_RGB_COLOR, ATTR_EFFECT_LIST, ATTR_EFFECT,
-    SUPPORT_RGB_COLOR, SUPPORT_EFFECT,
+    ATTR_BRIGHTNESS, SUPPORT_BRIGHTNESS, ATTR_HS_COLOR, ATTR_EFFECT_LIST, ATTR_EFFECT,
+    SUPPORT_COLOR, SUPPORT_EFFECT,
     Light, PLATFORM_SCHEMA)
 from homeassistant.const import CONF_NAME, CONF_IP_ADDRESS, CONF_PORT, CONF_DEVICE, CONF_TYPE
+import homeassistant.util.color as color_util
 
 _LOGGER = logging.getLogger(__name__)
 
 SUPPORT_FEELHOMEDIM = (SUPPORT_BRIGHTNESS | SUPPORT_EFFECT)
-SUPPORT_FEELHOMERGB = (SUPPORT_BRIGHTNESS | SUPPORT_RGB_COLOR | SUPPORT_EFFECT)
+SUPPORT_FEELHOMERGB = (SUPPORT_BRIGHTNESS | SUPPORT_COLOR | SUPPORT_EFFECT)
 
 EFFECT_MAP_POWER = {
         'static' : (0x50, 0x03)
@@ -125,8 +126,8 @@ class FeelHomePowerLight(Light):
     def turn_on(self, **kwargs):
         """Instruct the light to turn on and set correct brightness & color."""
         self._is_on = True
-        _LOGGER.info('turning on seqnum: {}, ip: {}, port: {}, devicenum: {}'.format(
-            self._seqnum, self._ip, self._port, self._devicenum))
+        _LOGGER.info('turning on seqnum: {}, ip: {}, port: {}, devicenum: {}, kwargs: {}'.format(
+            self._seqnum, self._ip, self._port, self._devicenum, repr(kwargs)))
         MSG_FMT = '>BBBBB'
         msg = pack(MSG_FMT, self._seqnum, self._devicenum, 0x50, 0x01, 0x01)
         self._sock.sendto(msg, (self._ip, self._port))
@@ -236,9 +237,11 @@ class FeelHomeRGBLight(FeelHomeDimLight):
         return SUPPORT_FEELHOMERGB
 
     def set_color(self, color):
+        if not color: 
+            return
         _LOGGER.info('setting brightness seqnum: {}, ip: {}, port: {}, devicenum: {}'.format(
             self._seqnum, self._ip, self._port, self._devicenum))
-        self._rgb_color = color
+        self._rgb_color = color 
         MSG_FMT = '>BBBBBBB'
         msg = pack(MSG_FMT, self._seqnum, self._devicenum, 0x43, 0x00,
                 self._rgb_color[0], self._rgb_color[1], self._rgb_color[2])
@@ -248,8 +251,10 @@ class FeelHomeRGBLight(FeelHomeDimLight):
     def turn_on(self, **kwargs):
         """Instruct the light to turn on and set correct brightness & color."""
         
-        if ATTR_RGB_COLOR in kwargs:
-            self.set_color(kwargs[ATTR_RGB_COLOR])
+        if ATTR_HS_COLOR in kwargs:
+            hs_color = kwargs.get(ATTR_HS_COLOR)
+            rgb = color_util.color_hs_to_RGB(*hs_color) if hs_color else None
+            self.set_color(rgb)
         super().turn_on(**kwargs)
 
 class FeelHomeStripeLight(FeelHomeRGBLight):
