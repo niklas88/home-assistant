@@ -2,6 +2,7 @@
 Support for Feel@Home DIY Devices
 """
 import logging
+import asyncio
 import socket
 from struct import pack, unpack
 
@@ -29,7 +30,7 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
 })
 
 
-def setup_platform(hass, config, add_devices, discovery_info=None):
+async def async_setup_platform(hass, config, async_add_devices, discovery_info=None):
     """Set up a Feel@Home Light platform."""
 
     name = config.get(CONF_NAME)
@@ -38,8 +39,16 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
     devicenum = config.get(CONF_DEVICE)
     devicetype = config.get(CONF_TYPE)
     
+    device = None
+
     if (devicetype == "PowerDevice"):
-      add_devices([FeelHomePowerDevice(name, ip, port, devicenum)])    
+        device = FeelHomePowerDevice(name, ip, port, devicenum)
+        
+    async_add_devices([device])   
+    connect = hass.loop.create_datagram_endpoint(
+        lambda: device,
+        remote_addr=(device._ip, device._port))
+    return hass.async_add_job(connect)
 
 
 class FeelHomePowerDevice(SwitchDevice):
@@ -48,13 +57,26 @@ class FeelHomePowerDevice(SwitchDevice):
     def __init__(self, name, ip, port, devicenum):
         """Initialize a Feel@Home Power Device.
         """
+        super().__init__() 
         self._name = name
         self._ip = ip
         self._port = port
         self._devicenum = devicenum
         self._is_on = False
-        self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._seqnum = 0
+
+    def connection_made(self, transport):
+        self._sock = transport
+
+    def datagram_received(self, data, addr):
+        _LOGGER.warn("datagram received %r" % data)
+
+    def error_received(self, exc):
+       _LOGGER.warn("error received " , exc)
+
+    def connection_lost(self, exc):
+       _LOGGER.warn("Socket closed, stop the event loop")
+
 
     @property
     def name(self):
@@ -69,7 +91,7 @@ class FeelHomePowerDevice(SwitchDevice):
     @property
     def should_poll(self) -> bool:
         """Return if we should poll this device."""
-        return False
+        return True
 
     @property
     def assumed_state(self) -> bool:
@@ -98,6 +120,6 @@ class FeelHomePowerDevice(SwitchDevice):
         self._seqnum = (self._seqnum+1)%256
         self.schedule_update_ha_state()
         
-#    def update(self) -> None:
-#        _LOGGER.warn("update called")
+    async def async_update(self) -> None:
+        _LOGGER.warn("update called")
 
