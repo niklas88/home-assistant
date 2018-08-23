@@ -127,7 +127,7 @@ class FeelHomePowerLight(Light):
 
     def connection_lost(self, exc):
        _LOGGER.warn("Socket closed, stop the event loop")
-       
+
     @property
     def name(self):
         """Return the display name of this light."""
@@ -169,7 +169,7 @@ class FeelHomePowerLight(Light):
         self._sock.sendto(msg, (self._ip, self._port))
         self._seqnum = (self._seqnum+1)%256
         self.schedule_update_ha_state()
-        
+
     async def async_update(self) -> None:
         _LOGGER.warn("update called")
 
@@ -275,7 +275,7 @@ class FeelHomeRGBLight(FeelHomeDimLight):
 
     def turn_on(self, **kwargs):
         """Instruct the light to turn on and set correct brightness & color."""
-        
+
         if ATTR_HS_COLOR in kwargs:
             hs_color = kwargs.get(ATTR_HS_COLOR)
             rgb = color_util.color_hs_to_RGB(*hs_color) if hs_color else None
