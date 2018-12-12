@@ -45,13 +45,13 @@ EFFECT_MAP_STRIPE.update({
         'fire' : (0x53, 0x07)
 })
 
-EFFECT_MAP_MATRIX = dict(EFFECT_MAP_COLOR)
+EFFECT_MAP_MATRIX = dict(EFFECT_MAP_STRIPE)
 EFFECT_MAP_MATRIX.update({
         'heart' : (0x4d, 0x00),
 })
 
 
-EFFECT_MAP_CLOCK = dict(EFFECT_MAP_COLOR)
+EFFECT_MAP_CLOCK = dict(EFFECT_MAP_MATRIX)
 EFFECT_MAP_CLOCK.update({
         'clock' : (0x54, 0x00)
 })
@@ -312,4 +312,4 @@ class FeelHomeWordClockLight(FeelHomeMatrixLight):
 
         """
         FeelHomeMatrixLight.__init__(self,name,ip,port,devicenum)
-        self._effect_map = EFFECT_MAP_MATRIX
+        self._effect_map = EFFECT_MAP_CLOCK
