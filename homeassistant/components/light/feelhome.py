@@ -45,6 +45,11 @@ EFFECT_MAP_STRIPE.update({
         'fire' : (0x53, 0x07)
 })
 
+EFFECT_MAP_STRIPE_RGBW = dict(EFFECT_MAP_STRIPE)
+EFFECT_MAP_STRIPE_RGBW.update({
+        'staticwhite' : (0x57, 0x00),
+})
+
 EFFECT_MAP_MATRIX = dict(EFFECT_MAP_STRIPE)
 EFFECT_MAP_MATRIX.update({
         'heart' : (0x4d, 0x00),
@@ -86,6 +91,8 @@ async def async_setup_platform(hass, config, async_add_devices, discovery_info=N
       device = FeelHomeRGBLight(name, ip, port, devicenum)
     elif (devicetype == "StripeLight"):
       device = FeelHomeStripeLight(name, ip, port, devicenum)
+    elif (devicetype == "StripeLightRGBW"):
+      device = FeelHomeStripeLightRGBW(name, ip, port, devicenum)
     elif (devicetype == "MatrixLight"):
       device = FeelHomeMatrixLight(name, ip, port, devicenum)
     elif (devicetype == "WordClockLight"):
@@ -293,6 +300,16 @@ class FeelHomeStripeLight(FeelHomeRGBLight):
         self._rgb_color = [255, 255, 255]
         self._effect_map = EFFECT_MAP_STRIPE 
 
+class FeelHomeStripeLightRGBW(FeelHomeStripeLight):
+    """Representation of a Feel@Home RGB Light."""
+
+    def __init__(self, name, ip, port, devicenum):
+        """Initialize a Feel@Home Light.
+
+        """
+        FeelHomeRGBLight.__init__(self,name,ip,port,devicenum)
+        self._rgb_color = [255, 255, 255]
+        self._effect_map = EFFECT_MAP_STRIPE_RGBW
 
 class FeelHomeMatrixLight(FeelHomeStripeLight):
     """Representation of a Feel@Home RGB Light."""
